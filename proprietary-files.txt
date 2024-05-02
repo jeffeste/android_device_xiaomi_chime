@@ -1,5 +1,5 @@
-# All unpinned blobs below are extracted from miui_LIMEGlobal_V12.5.11.0.RJQMIXM
-# Citrus blobs are imported from miui_CITRUSGlobal_V12.5.9.0.RJFMIXMmiui_CITRUSGlobal_V12.5.9.0.RJFMIXM
+# All unpinned blobs below are extracted from lime_eea_global_images_V14.0.5.0.SJQEUXM_20230619.0000.00_12.0_eea
+# Citrus blobs are imported from citrus_eea_global_images_V14.0.2.0.SJFEUXM_20230509.0000.00_12.0_eea
 
 # ACDB
 vendor/etc/acdbdata/IDP/bengal-scubaidp-snd-card/IDP_Scuba_Bluetooth_cal.acdb
