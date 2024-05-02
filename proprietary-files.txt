@@ -1330,7 +1330,9 @@ vendor/radio/qcril_database/qcril.db
 vendor/bin/init.qcom.sensors.sh
 vendor/bin/sensors.qti
 vendor/bin/sscrpcd
+vendor/etc/sensors/config/sns_dae.json
 vendor/etc/sensors/config/sns_distance_bound.json
+vendor/etc/sensors/config/sns_multishake.json
 vendor/etc/init/init.vendor.sensors.rc
 vendor/etc/init/vendor.sensors.qti.rc
 vendor/etc/init/vendor.sensors.sscrpcd.rc
