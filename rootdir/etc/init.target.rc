@@ -30,9 +30,6 @@
 #xiong add scancode
 import init.mishow.ctl.rc
 
-# Initialize logcat.rc
-import /vendor/etc/init/hw/logcat.rc
-
 on early-init
     exec u:r:vendor_modprobe:s0 -- /vendor/bin/modprobe -a -d /vendor/lib/modules audio_q6_pdr audio_q6_notifier audio_snd_event audio_apr audio_adsp_loader audio_q6 audio_native audio_usf audio_pinctrl_lpi audio_swr audio_swr_ctrl audio_platform audio_stub audio_wcd_core audio_wcd9xxx audio_wsa881x_analog audio_bolero_cdc audio_va_macro audio_rx_macro audio_tx_macro audio_mbhc audio_wcd937x audio_wcd937x_slave audio_pm2250_spmi audio_aw87359_audio audio_aw87519_audio audio_rouleur audio_rouleur_slave audio_machine_bengal
     write /proc/sys/kernel/sched_boost 1
@@ -51,18 +48,12 @@ on init
     start vendor.qseecomd
     start keymaster-4-0
 
-# Custom Sched Tunables
-   write /dev/stune/background/schedtune.prefer_idle 1
-   write /dev/stune/rt/schedtune.boost 1
-   write /dev/stune/rt/schedtune.prefer_idle 1
-   write /dev/stune/top-app/schedtune.boost 1
-
 on early-fs
     start vold
 
 on fs
     start hwservicemanager
-    mount_all /vendor/etc/fstab.qcom --early
+    mount_all --early
     chown root system /mnt/vendor/persist
     chmod 0771 /mnt/vendor/persist
     restorecon_recursive /mnt/vendor/persist
@@ -75,11 +66,13 @@ on post-fs
 on late-fs
     wait_for_prop hwservicemanager.ready true
     exec_start wait_for_keymaster
-    mount_all /vendor/etc/fstab.qcom --late
+    mount_all --late
 
 on post-fs-data
     mkdir /vendor/data/tombstones 0771 system system
     mkdir /data/vendor/tloc 0700 system drmrpc
+
+#Turbo sched
     chmod 0666 /sys/module/migt/parameters/mi_viptask
     restorecon /sys/module/migt/parameters/mi_viptask
 
@@ -96,20 +89,9 @@ on early-boot
     start vendor.sensors
 
 on boot
-# IRQ tuning from Razer Phone 2 
-    # msm_drm
-    write /proc/irq/7/smp_affinity_list 2
-    # kgsl-3d0
-    write /proc/irq/489/smp_affinity_list 1
 # wuzhisen change Define cpu set for audio app. This is to optimize
 # audio scheduling against lpm exit latencies
     write /dev/cpuset/audio-app/cpus 1-2
-    mkdir /dev/cpuset/camera-daemon
-    write /dev/cpuset/camera-daemon/cpus 0-7
-    write /dev/cpuset/camera-daemon/mems 0
-    chown cameraserver cameraserver /dev/cpuset/camera-daemon
-    chown cameraserver cameraserver /dev/cpuset/camera-daemon/tasks
-    chmod 0660 /dev/cpuset/camera-daemon/tasks
     chown system system /sys/kernel/hbtp/display_pwr
     start rmt_storage
     start rfs_access
@@ -215,18 +197,13 @@ on charger
     start vendor.power_off_alarm
     setprop vendor.usb.controller 4e00000.dwc3
     setprop sys.usb.configfs 1
-    wait /sys/class/power_supply/battery/temp
+#jiangxueqin start mi_thermald
     start mi_thermald
-
-on boot
-    wait /sys/class/power_supply/battery/temp
-    start mi_thermald
-
-#mi_thermald
-service mi_thermald /system/vendor/bin/mi_thermald
+    service mi_thermald /system/vendor/bin/mi_thermald
     class main
     user root
     group system
+    seclabel u:r:mi_thermald:s0
 
 #pd-mapper
 service vendor.pd_mapper /vendor/bin/pd-mapper
@@ -252,12 +229,6 @@ service vendor.mdm_helper /vendor/bin/mdm_helper
     group system wakelock
     disabled
 
-service vendor.adsprpcd /vendor/bin/adsprpcd
-    class main
-    user media
-    group media
-    disabled
-
 service audioshell_service /vendor/bin/audioshell_service
     oneshot
     disabled
@@ -280,6 +251,21 @@ service closead /system/vendor/bin/displayf_bin s 0
     group root system graphics
     oneshot
     disabled
+
+#add display by hanwenhao
+service displayfeature /system/bin/displayfeature
+    class hal
+    user root
+    interface vendor.xiaomi.hardware.displayfeature@1.0::IDisplayFeature default
+    group system root
+    oneshot
+
+service displayfeatureqservice /vendor/bin/hw/displayfeatureqservice
+    class hal
+    user system
+    interface vendor.xiaomi.hardware.displayfeatureqservice@1.0::IDisplayFeatureQservice default
+    group system root
+    oneshot
 
 # add PcbaConfigSet by tanrong
 service PcbaConfigSet /system/vendor/bin/PcbaConfigSet
@@ -312,12 +298,34 @@ service vendor.tlocd /vendor/bin/tloc_daemon
     user system
     group drmrpc gps net_raw
 
+#on property:vold.decrypt=trigger_restart_framework
+#   start vendor.cnss_diag
+
 service vendor.cnss_diag /system/vendor/bin/cnss_diag -q -f -t HELIUM
    class main
    user system
    group system wifi inet sdcard_rw media_rw diag
    disabled
    oneshot
+
+service vendor.tcpdump /system/bin/wlantcpdump -i any -W 2 -C 2 -s 134 -w /sdcard/MIUI/debug_log/common/tcpdump.pcap
+    class main
+    user root
+    group root wifi
+    disabled
+    oneshot
+
+on property:persist.vendor.tcpdump.enable=true
+    start vendor.tcpdump
+
+on property:persist.vendor.tcpdump.enable=false
+    stop vendor.tcpdump
+
+on property:persist.vendor.cnss_diag.enable=true
+    start vendor.cnss_diag
+
+on property:persist.vendor.cnss_diag.enable=false
+    stop vendor.cnss_diag
 
 #xiong add charge_logger
 service charge_logger vendor/bin/charge_logger
@@ -432,9 +440,6 @@ on boot
     #add for ignoring adsp crash
     write /sys/bus/msm_subsys/devices/subsys0/restart_level related
 
-    # Touchpanel
-    chown system system /sys/touchpanel/double_tap
-
 service dcvs-sh /vendor/bin/init.qti.dcvs.sh
     class late_start
     user root
@@ -454,22 +459,7 @@ service panel_color /vendor/bin/panelcolor_bin
 on property:sys.boot_completed=1
     start panel_color
 
-on property:vendor.post_boot.parsed=1
-
-# Enable suspend to RAM
-    write /sys/power/mem_sleep "deep"
-
-    # Restrict permissions to socket file
-    # to hide Magisk & co.
-    chmod 440 /proc/net/unix
-
 ########### FTM end ##########
 ########### FTM end ##########
 ########### FTM end ##########
 
-service checknv /system/bin/checknv
-    class main
-    user root
-    group root system
-    oneshot
-    seclabel u:r:checknv:s0
